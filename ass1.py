@@ -3,7 +3,7 @@ import math
 import cv2
 
 class RemoveElementsFromImage:
-    def ComputeCubicInterpolationCoefficients(self,upper,left,row, column, image):
+    def ComputeCubicInterpolationCoefficients1(self,upper,left,row, column, image):
         if (left == 0):
             x = np.array([-1.75, -0.75, 0.25, 1.25])
         else:
@@ -51,39 +51,46 @@ class RemoveElementsFromImage:
 
         return coeffs
 
-    def BuildImagePyramid(self, image, n):
+    def BuildImagePyramid(self, image, n,color):
+        element_size=list()
         smallerImage = image
         rows, columns = image.shape
+        element_pixels=[]
+        for l in range(rows):
+            for k in range(columns):
+                if image[l,k]==color:
+                    element_pixels.append((l,k))
+
+        element_size.append(element_pixels)
         pyramid = list()
         pyramid.append(image)
         while len(pyramid) < n:
+            element_pixels=[]
             image = smallerImage
             smallerImage = np.zeros((image.shape[0] / 2, image.shape[1] / 2), dtype=np.uint8)
             for i in range(smallerImage.shape[0]):
                 for j in range(smallerImage.shape[1]):
                     orig_i = 2 * i
                     orig_j = 2 * j
+                    if (orig_i, orig_j) in element_size[len(pyramid) - 1] or (orig_i+1, orig_j+1) in element_size[len(pyramid) - 1] or (orig_i+1, orig_j) in element_size[len(pyramid) - 1] or (orig_i, orig_j+1) in element_size[len(pyramid) - 1]:
+                        element_pixels.append((i,j))
                     averageOfPixels = (int(image[orig_i][orig_j]) + int(image[orig_i + 1][orig_j]) + int(
                         image[orig_i][orig_j + 1]) + int(image[orig_i + 1][orig_j + 1])) / 4
-                    # print 'averageOfPixels before',averageOfPixels
-                    # if averageOfPixels < 100:
-                    #     averageOfPixels = 0
-                    # else:
-                    #     averageOfPixels = 255
                     smallerImage[i][j] = averageOfPixels
-                    # print 'averageOfPixels after', averageOfPixels
+            element_size.append(element_pixels)
 
-            # n = n - 1
+           # n = n - 1
             pyramid.append(smallerImage)
            # cv2.imshow('pyramid level {:d}'.format(n),smallerImage)
             cv2.waitKey(0)
 
             #small to big
         pyramid.reverse()
+        element_size.reverse()
         # print 'PYRAMID', len(pyramid)
-        return pyramid
+        return (pyramid,element_size)
 
-    def ComputeCubicInterpolationCoefficients1(self, top, left, i, j, image):
+    def ComputeCubicInterpolationCoefficients(self, top, left, i, j, image):
         right_distances = [-1.25, -0.25, 0.75, 1.75]
         left_distances = [-1.75, -0.75, 0.25, 1.25]
         top_distances = [-1.25, -0.25, 0.75, 1.75]
@@ -132,85 +139,88 @@ class RemoveElementsFromImage:
 
     def RemoveElements(self, image, colors):
         rows, columns = image.shape
-        pyramid = self.BuildImagePyramid(image,7)
-        bigger_img = image
-        for level in range(len(pyramid)-1):
-        #for level in range(4):
-            img = pyramid[level]
-            print 'img RemoveElements',img
-            rows, columns = img.shape
-            print 'rows,cols',rows,columns
-            for i in range(rows):
-                coeffs = np.zeros(4, dtype=object)
-                for j in range(columns):
-                    # print 'i,j in remove',i,j
-                    # if img[i, j] != 255:
-                         # print 'Intensity', img[i, j]
+        for color in colors:
+            (pyramid,element_size) = self.BuildImagePyramid(image,8,color)
+            bigger_img = image
+            for level in range(len(pyramid)-1):
+            #for level in range(4):
+                img = pyramid[level]
+                print 'img RemoveElements',img
+                rows, columns = img.shape
+                print 'rows,cols',rows,columns
+                for i in range(rows):
+                    coeffs = np.zeros(4, dtype=object)
+                    for j in range(columns):
+                        # print 'i,j in remove',i,j
+                        # if img[i, j] != 255:
+                             # print 'Intensity', img[i, j]
 
-                    bigger_img = pyramid[level + 1]
-                   # cv2.imshow('pyramid level {:d}'.format(level + 1), bigger_img)
-                    if img[i, j] in colors and i>4 and i<img.shape[0] and j>4 and j<img.shape[1] :
+                        bigger_img = pyramid[level + 1]
+                       # cv2.imshow('pyramid level {:d}'.format(level + 1), bigger_img)
+                        if (i,j) in element_size[level] and i>4 and i<img.shape[0] and j>4 and j<img.shape[1] :
 
-                        avg = -1
-                        max_loop = 0
-                        while img[i,j] != avg and max_loop < 1:
-                            max_loop += 1
+                            avg = -1
+                            max_loop = 0
+                            while img[i,j] != avg and max_loop < 10:
+                                max_loop += 1
 
-                            # print 'img avg before',img[i,j],avg
+                                # print 'img avg before',img[i,j],avg
 
-                            coeffs[0] = self.ComputeCubicInterpolationCoefficients(True, True, i, j, img)
-                            coeffs[1] = self.ComputeCubicInterpolationCoefficients(True, False, i, j, img)
-                            coeffs[2] = self.ComputeCubicInterpolationCoefficients(False, False, i, j, img)
-                            coeffs[3] = self.ComputeCubicInterpolationCoefficients(False, True, i, j, img)
+                                coeffs[0] = self.ComputeCubicInterpolationCoefficients(True, True, i, j, img)
+                                coeffs[1] = self.ComputeCubicInterpolationCoefficients(True, False, i, j, img)
+                                coeffs[2] = self.ComputeCubicInterpolationCoefficients(False, False, i, j, img)
+                                coeffs[3] = self.ComputeCubicInterpolationCoefficients(False, True, i, j, img)
 
-                            # dealing with image boundaries
-                            # i = np.clip(i, 2, rows - 4)
-                            # j = np.clip(j, 2, columns - 4)
+                                # dealing with image boundaries
+                                # i = np.clip(i, 2, rows - 4)
+                                # j = np.clip(j, 2, columns - 4)
 
-                            # print 'img window 0', img[i - 2:i + 2, j - 1:j + 3]
+                                # print 'img window 0', img[i - 2:i + 2, j - 1:j + 3]
 
-                            sum0 = self.sum_mul(coeffs[0], img[i - 2:i + 2, j - 1:j + 3])
-                            print 'sum0',sum0
-                            sum1 = self.sum_mul(coeffs[1], img[i - 1:i + 3, j - 1:j + 3])
-                            print 'sum1', sum1
-                            sum2 = self.sum_mul(coeffs[2], img[i - 1:i + 3, j - 2:j + 2])
-                            print 'sum2', sum2
-                            sum3 = self.sum_mul(coeffs[3], img[i - 2:i + 2, j - 2:j + 2])
-                            print 'sum3', sum3
-                            quarter0 = np.clip(sum0, 0, 255)
-                            quarter1 = np.clip(sum1, 0, 255)
-                            quarter2 = np.clip(sum2, 0, 255)
-                            quarter3 = np.clip(sum3, 0, 255)
+                                sum0 = self.sum_mul(coeffs[0], img[i - 2:i + 2, j - 1:j + 3])
+                                print 'sum0',sum0
+                                sum1 = self.sum_mul(coeffs[1], img[i - 1:i + 3, j - 1:j + 3])
+                                print 'sum1', sum1
+                                sum2 = self.sum_mul(coeffs[2], img[i - 1:i + 3, j - 2:j + 2])
+                                print 'sum2', sum2
+                                sum3 = self.sum_mul(coeffs[3], img[i - 2:i + 2, j - 2:j + 2])
+                                print 'sum3', sum3
+                                quarter0 = np.clip(sum0, 0, 255)
+                                quarter1 = np.clip(sum1, 0, 255)
+                                quarter2 = np.clip(sum2, 0, 255)
+                                quarter3 = np.clip(sum3, 0, 255)
 
-                            bigger_img = pyramid[level + 1]
-                            print 'img pyramid[level + 1]', bigger_img
-                            avg = int(math.ceil((quarter0+quarter1+quarter2+quarter3)/4))
+                                bigger_img = pyramid[level + 1]
+                                print 'img pyramid[level + 1]', bigger_img
+                                avg = int(math.ceil((quarter0+quarter1+quarter2+quarter3)/4))
 
-                            # print 'img avg after', img[i, j], avg
-                            img[i, j] = avg
-                            new_i = i * 2
-                            new_j = j * 2
-                            bigger_rows, bigger_columns = bigger_img.shape
-                            print 'i,j',i,j
-                            bigger_img[np.clip(new_i + 1, 0, bigger_rows-1), np.clip(new_j, 0, bigger_columns - 1)] = quarter0
-                            bigger_img[np.clip(new_i + 1, 0, bigger_rows-1), np.clip(new_j + 1,0,bigger_columns-1)] = quarter1
-                            bigger_img[np.clip(new_i, 0, bigger_rows-1), np.clip(new_j + 1,0,bigger_columns-1)] = quarter2
-                            bigger_img[np.clip(new_i, 0, bigger_rows-1), np.clip(new_j,0,bigger_columns-1)] = quarter3
-                           # cv2.imshow('pyramid level after {:d}'.format(level + 1), bigger_img)
-                        # keep doing interpolation until no changes on that level
+                                # print 'img avg after', img[i, j], avg
+                                img[i, j] = avg
+                                new_i = i * 2
+                                new_j = j * 2
+                                bigger_rows, bigger_columns = bigger_img.shape
+                                print 'i,j',i,j
+                                bigger_img[np.clip(new_i + 1, 0, bigger_rows-1), np.clip(new_j, 0, bigger_columns - 1)] = quarter0
+                                bigger_img[np.clip(new_i + 1, 0, bigger_rows-1), np.clip(new_j + 1,0,bigger_columns-1)] = quarter1
+                                bigger_img[np.clip(new_i, 0, bigger_rows-1), np.clip(new_j + 1,0,bigger_columns-1)] = quarter2
+                                bigger_img[np.clip(new_i, 0, bigger_rows-1), np.clip(new_j,0,bigger_columns-1)] = quarter3
+                               # cv2.imshow('pyramid level after {:d}'.format(level + 1), bigger_img)
+                            # keep doing interpolation until no changes on that level
 
         return bigger_img
 
 
 if __name__ == '__main__':
     print 'reading image'
-    img = cv2.imread('3.png', 0)
-    # size = 400
-    # img = np.zeros((size, size))
-    # for i in range(size):
-    #     for j in range(size):
-    #         if not (50 < i < 70 and 50 < j < 70):
-    #             img[i, j] = 255
+    #img = cv2.imread('3.png', 0)
+    size = 400
+    img = np.zeros((size, size))
+    for i in range(size):
+        for j in range(size):
+            if not (50 < i < 70 and 50 < j <70):
+                img[i, j] = 195
+            # else:
+            #     img[i,j]=255
 
     print 'showing image',img
     cv2.imshow('original image', img)
