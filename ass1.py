@@ -64,7 +64,8 @@ class RemoveElementsFromImage:
         element_size.append(element_pixels)
         pyramid = list()
         pyramid.append(image)
-        while len(pyramid) < n:
+        #while len(pyramid) < n:
+        while len(element_pixels) > n:
             print "pyramid len",len(pyramid)
             element_pixels=[]
             image = smallerImage
@@ -79,7 +80,8 @@ class RemoveElementsFromImage:
                     averageOfPixels = (int(image[orig_i][orig_j]) + int(image[orig_i + 1][orig_j]) + int(
                         image[orig_i][orig_j + 1]) + int(image[orig_i + 1][orig_j + 1])) / 4
                     smallerImage[i][j] = averageOfPixels
-            element_size.append(element_pixels)
+            if len(element_pixels) > n:
+              element_size.append(element_pixels)
 
            # n = n - 1
             pyramid.append(smallerImage)
@@ -142,7 +144,7 @@ class RemoveElementsFromImage:
     def RemoveElements(self, image, colors):
         rows, columns = image.shape
         for color in colors:
-            (pyramid,element_size) = self.BuildImagePyramid(image,7,color)
+            (pyramid,element_size) = self.BuildImagePyramid(image,16,color)
             bigger_img = image
             for level in range(len(pyramid)-1):
             #for level in range(4):
@@ -222,7 +224,7 @@ if __name__ == '__main__':
         for j in range(size):
             if (50 < i < 90) and (50 < j <90):
                 img[i, j] = 200
-            elif (200 < i < 350) and (200 < j <350):
+            elif (100 < i < 250) and (100 < j <250):
                 img[i, j] = 90
             else:
                 img[i,j]=200
