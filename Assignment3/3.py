@@ -1,12 +1,58 @@
 import cv2
-print cv2.__version__
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 
+def oneDimFFT(samples):
+
+    n = len(samples)
+
+    if n == 1:
+
+        return samples
+
+    w_n = np.exp(-2j * np.pi / n)
+
+    w = 1
+
+    a_even = samples[0::2]
+
+    a_odd = samples[1::2]
+
+
+
+    y_0 = oneDimFFT(a_even)
+
+    y_1 = oneDimFFT(a_odd)
+
+    y = np.zeros(n) + 0 * 1j
+
+    m = int(n / 2)
+
+    for k in range(m):
+
+        y[k] = y_0[k] + (w * y_1[k])
+
+        y[k + m] = y_0[k] - (w * y_1[k])
+
+        w *= w_n
+
+    return y
+
+
+
+
+
+def twoDimFFT_test(samples):
+
+    fftRows = np.array([oneDimFFT(row) for row in samples])
+
+    return np.array([oneDimFFT(row) for row in fftRows.transpose()]).transpose()
+
+
 def DFT_slow(x):
     """Compute the discrete Fourier Transform of the 1D array x"""
-    x = np.asarray(x, dtype=float)
+    x = np.asarray(x.real, dtype=float)
     N = x.shape[0]
     n = np.arange(N)
     k = n.reshape((N, 1))
@@ -17,7 +63,7 @@ def DFT_slow(x):
 
 def FFT(x):
     """A recursive implementation of the 1D Cooley-Tukey FFT"""
-    x = np.asarray(x, dtype=float)
+    x = np.asarray(x.real, dtype=float)
     N = x.shape[0]
     if N <= 100:  # this cutoff should be optimized
         return DFT_slow(x)
@@ -74,6 +120,15 @@ def FFT(x):
 
         return np.concatenate([first_half,
                                sec_half])
+def fftpad(f):
+    m, n = f.shape
+    M, N = 2 ** int(math.ceil(math.log(m, 2))), 2 ** int(math.ceil(math.log(n, 2)))
+    pf =np.zeros(shape=(M,N))
+    for i in range(0, m):
+        for j in range(0, n):
+            pf[i][j] = f[i][j]
+    return pf
+
 
 def twoDimFFT(samples):
     fftRows = np.array([FFT(row) for row in samples])
@@ -87,7 +142,8 @@ def ImagePadding(img1, filter1):
     # pad image
     # should we pad with 0's or replicate?
     # cv2.BORDER_CONSTANT, value=0
-    padded_img = cv2.copyMakeBorder(img1, pad, pad, pad, pad, cv2.BORDER_REPLICATE)
+    # padded_img = cv2.copyMakeBorder(img1, pad, pad, pad, pad, cv2.BORDER_REPLICATE)
+    padded_img = np.lib.pad(img1, (pad, pad), 'constant')
 
     return padded_img
 
@@ -112,7 +168,7 @@ def Convolve(img2, filter2):
             # convolve
             k = (area * filter2).sum()
             # store convolved value in result image
-            result[y - pad, x - pad] = k
+            result[y - pad, x - pad] = k.real
 
     # rescale the output image to be in the range [0, 255]
     # result = rescale_intensity(result, in_range=(0, 255))
@@ -176,25 +232,48 @@ if __name__ == '__main__':
     #     for n in range(img.shape[1]):
     #         if m < n :
     #             img[m,n] = 1
-    img = cv2.imread('image4.jpg', 0)
+    # img = cv2.imread('InputImage.png', 0)
+    img = cv2.imread('lena.jpg',0)
+    # img = cv2.imread('InputImage.png', 0)
     # print 'img', img[::2]
+    fq_img = twoDimFFT(img)
+    # fq_img = np.fft.fft2(img)
+    fshift = np.fft.fftshift(fq_img)
+    # magnitude_spectrum = 20 * np.log(np.abs(fshift))
+    # cv2.imwrite('test.png',magnitude_spectrum)
     # convolve image with filter
-    # convolved_img = Convolve(img, filter)
+    convolved_img = Convolve(fshift, filter)
+    spatial_img = np.fft.ifft2(convolved_img)
+    # fshift = np.fft.ifftshift(spatial_img)
+    magnitude_spectrum1 = 20 * np.log(np.abs(spatial_img))
+    print 'conv ',np.uint8(magnitude_spectrum1)
+
+    cv2.imwrite('res.png',np.uint8(magnitude_spectrum1))
+    # spatial_imgshift, = np.array([spatial_img.real])
     # show original image
-    cv2.imshow('original image', img)
+    # cv2.imshow('original image', img)
     # show convolved image
-    # cv2.imshow('convolved image', convolved_img)
+    # cv2.imshow('convolved image', spatial_img.real)
     # test = np.fft.fft2(img)
-    test = twoDimFFT(img)
-    # print 'test', test
-    fshift = np.fft.fftshift(test)
-    magnitude_spectrum = 20 * np.log(np.abs(fshift))
-    plt.subplot(122), plt.imshow(magnitude_spectrum, cmap='gray')
-    plt.title('Input Image'), plt.xticks([]), plt.yticks([])
-    plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
-    plt.show()
-    a =  np.array([1,3,3,3,5,3])
-    b =  np.array([1,1,1])
-    # cv2.imshow('test image', test)
+    # test = twoDimFFT(img)
+    # fshift = np.fft.fftshift(test)
+    # magnitude_spectrum = 20 * np.log(np.abs(fshift))
+    # cv2.imwrite('test.png',magnitude_spectrum)
+    # plt.subplot(122), plt.imshow(magnitude_spectrum, cmap='gray')
+    # plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+    # plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
+    # plt.show()
     # wait for exit
-    cv2.waitKey(0)
+    #------------------------------
+    # img = cv2.imread('image4.jpg', 0)
+    # cv2.imshow(' image4', img)
+    # f = np.fft.fft2(img)
+    # fshift = np.fft.fftshift(f)
+    # f_ishift = np.fft.ifftshift(fshift)
+    # d_shift = np.array(np.dstack([f_ishift.real, f_ishift.imag]))
+    # # img_back = cv2.idft(d_shift)
+    # img_back = np.fft.ifft2(d_shift)
+    # d_shift1 = np.array(np.dstack([img_back.real, img_back.imag]))
+    # # img = cv2.magnitude(d_shift1[:, :, 0], d_shift1[:, :, 1])
+    # cv2.imshow(' image', img)
+    # cv2.waitKey(0)
