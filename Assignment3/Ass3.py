@@ -33,8 +33,8 @@ def FFT_helper(x):
     if N <= 100:  # this cutoff should be optimized
         return DFT_slow(x)
     else:
-        X_even = FFT(x[::2])
-        X_odd = FFT(x[1::2])
+        X_even = FFT_helper(x[::2])
+        X_odd = FFT_helper(x[1::2])
         factor = np.exp(-2j * np.pi * np.arange(N) / N)
         #first half
         X_odd_pad1 = X_odd
@@ -89,6 +89,14 @@ def FFT_helper(x):
 def FFT(samples):
         fftRows = np.array([FFT_helper(row) for row in samples])
         return np.array([FFT_helper(row) for row in fftRows.transpose()]).transpose()
+def IFFT_helper(x):
+    fft = FFT_helper(x)
+    ifft = np.divide(fft[-np.arange(fft.shape[0])], x.shape[-1])
+    return ifft
+#2d ifft
+def IFFT(samples):
+    ifftRows = np.array([IFFT_helper(row) for row in samples])
+    return np.array([IFFT_helper(row) for row in ifftRows.transpose()]).transpose()
 
 def Convolve(image, filt):
     print 'filt', filt.shape
@@ -191,8 +199,11 @@ if __name__ == '__main__':
     # padded_img = ImagePadding(img)
     # filters
     F1 = generateGaussianFilter(img, 30, False)
-    cv2.imshow('Filter : Frequency Domain', np.uint8(255*F1))
+    # cv2.imshow('Filter : Frequency Domain', np.uint8(255*F1))
+    img = FFT(img)
     convolved_img = Convolve(img, F1)
+    convolved_img = IFFT(convolved_img)
+    # convolved_img = np.fft.ifft2(convolved_img)
     magnitude = np.abs(convolved_img)
     magnitude_spectrum = 20 * np.log(magnitude)
     cv2.imshow('Image : Filtered Frequency Domain',  np.uint8(magnitude_spectrum))
